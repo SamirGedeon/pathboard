@@ -1,0 +1,32 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.9"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.3"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: uv sync --frozen --directory backend
+      - run: uv run --directory backend ruff check pathboard tests
+      - run: uv run --directory backend ruff format --check pathboard tests
+      - run: uv run --directory backend pytest -q
+      - run: npm ci --prefix web
+      - run: npm run build --prefix web
+      - run: npx playwright install --with-deps chromium --only-shell
+        working-directory: web
+      - run: npm run test:e2e --prefix web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failures
+          path: web/test-results
